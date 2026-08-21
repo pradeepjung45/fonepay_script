@@ -5,16 +5,16 @@ export default async function handler(req, res) {
   }
 
   try {
-    const response = await fetch('https://gibl.finpos.global/finpos/web-api/tms-platform/v1/public/txn/fonepay/notify', {
+    const response = await fetch('https://staging.finpos.global/web-api/tms-platform/v1/public/txn/fonepay/notify', {
       method: 'POST',
       headers: {
         'Subscription-Key': 'bd3f59b9902a46b4a933691ec0f94a31',
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        terminalId: "2222030020699026",
-        merchantId: "2222030020699026",
-        amount: 19
+        terminalId: "22221000",
+        merchantId: "2222100013436122",
+        amount: 100
       })
     });
 
