@@ -1,7 +1,17 @@
 export default async function handler(req, res) {
-  // We only allow GET or POST requests
   if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
+  }
+
+  // This is a unique secret channel where your alerts will be sent
+  const ALERT_CHANNEL = 'fonepay_alerts_pradeep_4599'; 
+
+  async function sendAlert(title, message) {
+    await fetch(`https://ntfy.sh/${ALERT_CHANNEL}`, {
+        method: 'POST',
+        body: message,
+        headers: { 'Title': title, 'Tags': 'warning,rotating_light' }
+    });
   }
 
   try {
@@ -19,19 +29,39 @@ export default async function handler(req, res) {
     });
 
     const data = await response.text();
+    let isHealthy = false;
     
-    // Return a success response so cron-job.org knows it worked
+    try {
+        const parsedData = JSON.parse(data);
+        // If Fonepay returns responseCode "0", we assume the device is online and healthy
+        if (parsedData.responseCode === "0") {
+            isHealthy = true;
+        }
+    } catch(e) {
+        // Failed to parse JSON, something is wrong
+    }
+
+    // IF THE DEVICE IS OFFLINE OR RETURNS AN ERROR:
+    if (!isHealthy) {
+        await sendAlert(
+          'Device Offline / Error Alert', 
+          `⚠️ Fonepay Device 22221000 did not return a success code. It might be OFFLINE or off WiFi!\n\nAPI Response: ${data}`
+        );
+    }
+    
     return res.status(200).json({ 
       success: true, 
-      message: "Fonepay notify request sent successfully",
+      deviceStatus: isHealthy ? "ONLINE" : "OFFLINE_OR_ERROR",
       apiResponse: data 
     });
 
   } catch (error) {
-    console.error("Error sending request:", error);
-    return res.status(500).json({ 
-      success: false, 
-      error: error.message 
-    });
+    // If the Fonepay server itself crashes or is unreachable
+    await sendAlert(
+      'Fonepay API Down', 
+      `🚨 CRITICAL: Cannot reach the Fonepay API at all. Error: ${error.message}`
+    );
+
+    return res.status(500).json({ success: false, error: error.message });
   }
 }
