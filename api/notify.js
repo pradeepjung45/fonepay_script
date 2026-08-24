@@ -3,7 +3,6 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  // The secret channel for your alerts
   const ALERT_CHANNEL = 'fonepay_alerts_pradeep_4599'; 
 
   async function sendAlert(title, message) {
@@ -14,63 +13,97 @@ export default async function handler(req, res) {
     });
   }
 
-  try {
-    const response = await fetch('https://staging.finpos.global/web-api/tms-platform/v1/public/txn/fonepay/notify', {
-      method: 'POST',
-      headers: {
-        'Subscription-Key': 'bd3f59b9902a46b4a933691ec0f94a31',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        terminalId: "22221000",
-        merchantId: "2222100013436122",
-        amount: 100
-      })
-    });
+  // Device 1 (Staging)
+  const device1 = {
+    url: 'https://staging.finpos.global/web-api/tms-platform/v1/public/txn/fonepay/notify',
+    body: { terminalId: "22221000", merchantId: "2222100013436122", amount: 100 }
+  };
 
-    const data = await response.text();
-    let isHealthy = false;
-    
+  // Device 2 (GIBL)
+  const device2 = {
+    url: 'https://gibl.finpos.global/finpos/web-api/tms-platform/v1/public/txn/fonepay/notify',
+    body: { terminalId: "2222030020699026", merchantId: "2222030020699026", amount: 20 }
+  };
+
+  const headers = {
+    'Subscription-Key': 'bd3f59b9902a46b4a933691ec0f94a31',
+    'Content-Type': 'application/json'
+  };
+
+  // Function to ping a specific device
+  async function pingDevice(device) {
     try {
-        const parsedData = JSON.parse(data);
-        // If Fonepay returns responseCode "0", we assume the device is online and healthy
-        if (parsedData.responseCode === "0") {
-            isHealthy = true;
-        }
-    } catch(e) {
-        // Failed to parse JSON, something is wrong
+      const response = await fetch(device.url, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(device.body)
+      });
+      const data = await response.text();
+      
+      let isHealthy = false;
+      try {
+          const parsedData = JSON.parse(data);
+          if (parsedData.responseCode === "0") isHealthy = true;
+      } catch(e) {}
+      
+      return { 
+        terminalId: device.body.terminalId, 
+        success: isHealthy, 
+        response: data, 
+        error: null 
+      };
+    } catch (error) {
+      return { 
+        terminalId: device.body.terminalId, 
+        success: false, 
+        response: null, 
+        error: error.message 
+      };
+    }
+  }
+
+  try {
+    // Run both requests at the exact same time (Parallel)
+    const results = await Promise.all([
+      pingDevice(device1), 
+      pingDevice(device2)
+    ]);
+    
+    let allHealthy = true;
+    let failedDevices = [];
+    
+    // Check if any of them failed
+    for (const res of results) {
+       if (!res.success) {
+           allHealthy = false;
+           failedDevices.push(res);
+       }
     }
 
-    // IF THE DEVICE IS OFFLINE OR RETURNS AN ERROR:
-    if (!isHealthy) {
+    // If one or both fail, send alert and return 500
+    if (!allHealthy) {
+        let errorMsg = failedDevices.map(d => `Device ${d.terminalId} failed: ${d.error || d.response}`).join('\n\n');
         await sendAlert(
-          'Device Offline / Error Alert', 
-          `⚠️ Fonepay Device 22221000 did not return a success code. It might be OFFLINE or off WiFi!\n\nAPI Response: ${data}`
+          'Device Error Alert', 
+          `⚠️ One or more Fonepay devices failed!\n\n${errorMsg}`
         );
         
-        // Return a 500 status so cron-job.org marks this run as FAILED (Red)
         return res.status(500).json({ 
           success: false, 
-          error: "Device returned a non-zero response code",
-          apiResponse: data 
+          error: "One or more devices returned a non-zero response code",
+          results: results 
         });
     }
     
-    // IF SUCCESSFUL: return 200 OK so cron-job.org marks it as SUCCESS (Green)
+    // If both succeed, return 200 OK
     return res.status(200).json({ 
       success: true, 
-      deviceStatus: "ONLINE",
-      apiResponse: data 
+      deviceStatus: "ALL_ONLINE",
+      results: results 
     });
 
   } catch (error) {
-    // If the Fonepay server itself crashes or is unreachable
-    await sendAlert(
-      'Fonepay API Down', 
-      `🚨 CRITICAL: Cannot reach the Fonepay API at all. Error: ${error.message}`
-    );
-
-    // Return a 500 status so cron-job.org marks this run as FAILED (Red)
+    await sendAlert('Fonepay API Down', `🚨 CRITICAL Error running script: ${error.message}`);
     return res.status(500).json({ success: false, error: error.message });
   }
 }
