@@ -3,7 +3,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  // This is a unique secret channel where your alerts will be sent
+  // The secret channel for your alerts
   const ALERT_CHANNEL = 'fonepay_alerts_pradeep_4599'; 
 
   async function sendAlert(title, message) {
@@ -47,11 +47,19 @@ export default async function handler(req, res) {
           'Device Offline / Error Alert', 
           `⚠️ Fonepay Device 22221000 did not return a success code. It might be OFFLINE or off WiFi!\n\nAPI Response: ${data}`
         );
+        
+        // Return a 500 status so cron-job.org marks this run as FAILED (Red)
+        return res.status(500).json({ 
+          success: false, 
+          error: "Device returned a non-zero response code",
+          apiResponse: data 
+        });
     }
     
+    // IF SUCCESSFUL: return 200 OK so cron-job.org marks it as SUCCESS (Green)
     return res.status(200).json({ 
       success: true, 
-      deviceStatus: isHealthy ? "ONLINE" : "OFFLINE_OR_ERROR",
+      deviceStatus: "ONLINE",
       apiResponse: data 
     });
 
@@ -62,6 +70,7 @@ export default async function handler(req, res) {
       `🚨 CRITICAL: Cannot reach the Fonepay API at all. Error: ${error.message}`
     );
 
+    // Return a 500 status so cron-job.org marks this run as FAILED (Red)
     return res.status(500).json({ success: false, error: error.message });
   }
 }
