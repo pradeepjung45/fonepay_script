@@ -13,16 +13,16 @@ export default async function handler(req, res) {
     });
   }
 
-  // Device 1 (Staging)
+  // Device 1 (GIBL)
   const device1 = {
-    url: 'https://staging.finpos.global/web-api/tms-platform/v1/public/txn/fonepay/notify',
-    body: { terminalId: "22221000", merchantId: "2222100013436122", amount: 100 }
+    url: 'https://gibl.finpos.global/finpos/web-api/tms-platform/v1/public/txn/fonepay/notify',
+    body: { terminalId: "2222030020699026", merchantId: "2222030020699026", amount: 1008 }
   };
 
-  // Device 2 (GIBL)
+  // Device 2 (Staging)
   const device2 = {
-    url: 'https://gibl.finpos.global/finpos/web-api/tms-platform/v1/public/txn/fonepay/notify',
-    body: { terminalId: "2222030020699026", merchantId: "2222030020699026", amount: 20 }
+    url: 'https://staging.finpos.global/web-api/tms-platform/v1/public/txn/fonepay/notify',
+    body: { terminalId: "2344234234343", merchantId: "2344234234343", amount: 1010 }
   };
 
   const headers = {
@@ -73,10 +73,10 @@ export default async function handler(req, res) {
     let failedDevices = [];
     
     // Check if any of them failed
-    for (const res of results) {
-       if (!res.success) {
+    for (const r of results) {
+       if (!r.success) {
            allHealthy = false;
-           failedDevices.push(res);
+           failedDevices.push(r);
        }
     }
 
