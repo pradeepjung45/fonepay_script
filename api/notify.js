@@ -16,14 +16,16 @@ export default async function handler(req, res) {
   // Device 1 (GIBL)
   const device1 = {
     url: 'https://gibl.finpos.global/finpos/web-api/tms-platform/v1/public/txn/fonepay/notify',
-    body: { terminalId: "2222030020699026", merchantId: "2222030020699026", amount: 1008 }
+    body: { terminalId: "2222030020699026", merchantId: "2222030020699026", amount: 10 }
   };
 
+  /*
   // Device 2 (Staging)
   const device2 = {
     url: 'https://staging.finpos.global/web-api/tms-platform/v1/public/txn/fonepay/notify',
     body: { terminalId: "2344234234343", merchantId: "2344234234343", amount: 1010 }
   };
+  */
 
   const headers = {
     'Subscription-Key': 'bd3f59b9902a46b4a933691ec0f94a31',
@@ -65,8 +67,8 @@ export default async function handler(req, res) {
   try {
     // Run both requests at the exact same time (Parallel)
     const results = await Promise.all([
-      pingDevice(device1), 
-      pingDevice(device2)
+      pingDevice(device1)
+      // pingDevice(device2)
     ]);
     
     let allHealthy = true;
